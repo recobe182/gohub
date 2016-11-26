@@ -9,7 +9,7 @@ go get github.com/recobe182/gohub
 ```
 
 ## Documentation
-See [Go Doc](https://godoc.org/qpid.apache.org/amqp).
+See [Go Doc](https://godoc.org/github.com/recobe182/gohub).
 
 ## Getting started
 ### Send
