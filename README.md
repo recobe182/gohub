@@ -2,6 +2,7 @@
 Azure Event Hub client for Go.
 
 _This repository is under active development._
+_Not ready for PRODUCTION._
 
 ## Installation
 ```
