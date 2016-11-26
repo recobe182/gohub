@@ -23,7 +23,7 @@ type EVHConnection interface {
 	CreateSender() (EVHSender, error)
 
 	// CreateReceiver creates a new receiver on the DefaultSession.
-	CreateReceiver(cg string, p int) (EVHReceiver, error)
+	CreateReceiver(p int, ss storageSetting, opts ...ReceiverOption) (EVHReceiver, error)
 
 	// Close the connection.
 	Close() error
@@ -98,14 +98,27 @@ func (c*evhConnection) CreateSender() (EVHSender, error) {
 	return &evhSender{sender: s}, nil
 }
 
-func (c*evhConnection) CreateReceiver(cg string, p int) (EVHReceiver, error) {
+func (c*evhConnection) CreateReceiver(p int, ss storageSetting, opts ...ReceiverOption) (EVHReceiver, error) {
+	rs := receiverSetting{
+		consumerGroup: `$Default`,
+		partition: p,
+	}
+	for _, set := range opts {
+		set(&rs)
+	}
+	return c.newReceiver(rs)
+}
+
+func (c*evhConnection) newReceiver(rs receiverSetting) (EVHReceiver, error) {
 	r, err := c.conn.Receiver(
-		electron.Source(fmt.Sprintf(receivePattern, c.hub, cg, strconv.Itoa(p))),
+		electron.Source(fmt.Sprintf(receivePattern, c.hub, rs.consumerGroup, rs.partition)),
+		electron.Prefetch(true),
+		electron.Capacity(rs.prefetchCount),
 	)
 	if err != nil {
 		return nil, err
 	}
-	return &evhReceiver{receiver: r, partition: p}, nil
+	return &evhReceiver{receiver: r, partition: rs.partition}, nil
 }
 
 func (c*evhConnection) Close() error {

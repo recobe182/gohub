@@ -6,6 +6,26 @@ import (
 	log "github.com/Sirupsen/logrus"
 )
 
+// ReceiverOption can be passed when creating a receiver to set optional configuration.
+type ReceiverOption func(*receiverSetting)
+
+type receiverSetting struct {
+	partition int
+
+	consumerGroup string
+	checkPointAfter int
+	prefetchCount int
+}
+
+// ConsumerGroup returns a ReceiverOption that sets consumer group.
+func ConsumerGroup(s string) ReceiverOption { return func(l *receiverSetting) { l.consumerGroup = s } }
+
+// CheckPointAfter returns a ReceiverOption that sets check point after receive a specific amount of messages.
+func CheckPointAfter(i int) ReceiverOption { return func(l *receiverSetting) { l.checkPointAfter = i } }
+
+// PrefetchCount returns a ReceiverOption that sets prefetch count.
+func PrefetchCount(i int) ReceiverOption { return func(l *receiverSetting) { l.prefetchCount = i } }
+
 // ReceiveMessage is a message struct.
 type ReceiveMessage struct {
 	// Msg is a message body.
