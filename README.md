@@ -46,6 +46,21 @@ for outcome := range o {
 	
 ```
 
+## Running application
+Due to the fact that this library use qpid.apache.org/electron as a AMQP1.0 library, you have to install proton-c on your development environment. 
+Unfortunately proton-c is not available for Mac OSX, please use [pre-built docker image](https://hub.docker.com/r/recobe/ubuntu/tags/) as a workaround to build and run an application.
+
+If you want to build an application
+```
+docker pull recobe/ubuntu:16.10-proton-go
+```
+then map your $GOPATH to /go.
+
+If you just want to run your application inside docker container, just put a binary file inside this container.
+```
+docker pull recobe/ubuntu:16.10-proton
+```
+
 ## Development plan
 - [ ] Integration with Azure blob storage.
 - [ ] Receiving message with partition offset.
