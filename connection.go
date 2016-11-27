@@ -98,10 +98,13 @@ func (c*evhConnection) CreateSender() (EVHSender, error) {
 	return &evhSender{sender: s}, nil
 }
 
-func (c*evhConnection) CreateReceiver(p int, ss storageSetting, opts ...ReceiverOption) (EVHReceiver, error) {
+func (c*evhConnection) CreateReceiver(pid int, ss storageSetting, opts ...ReceiverOption) (EVHReceiver, error) {
 	rs := receiverSetting{
-		consumerGroup: `$Default`,
-		partition: p,
+		partitionId: strconv.Itoa(pid),
+		consumerGroup: defaultConsumerGroup,
+		prefetchCount: defaultPrefetchCount,
+		checkPointAfter: defaultCheckpointAfter,
+		storageSetting: ss,
 	}
 	for _, set := range opts {
 		set(&rs)
@@ -111,14 +114,21 @@ func (c*evhConnection) CreateReceiver(p int, ss storageSetting, opts ...Receiver
 
 func (c*evhConnection) newReceiver(rs receiverSetting) (EVHReceiver, error) {
 	r, err := c.conn.Receiver(
-		electron.Source(fmt.Sprintf(receivePattern, c.hub, rs.consumerGroup, rs.partition)),
+		electron.Source(fmt.Sprintf(receivePattern, c.hub, rs.consumerGroup, rs.partitionId)),
 		electron.Prefetch(true),
 		electron.Capacity(rs.prefetchCount),
 	)
 	if err != nil {
 		return nil, err
 	}
-	return &evhReceiver{receiver: r, partition: rs.partition}, nil
+	return &evhReceiver{
+		receiver: r,
+		hub: c.hub,
+		consumerGroup: rs.consumerGroup,
+		partitionId: rs.partitionId,
+		checkpointAfter: rs.checkPointAfter,
+		p: newPartition(c.hub, rs.consumerGroup, rs.partitionId, newAzureStorage(rs.storageSetting)),
+	}, nil
 }
 
 func (c*evhConnection) Close() error {
