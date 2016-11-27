@@ -31,7 +31,8 @@ c, err := gohub.New(`a_namespace`, `a_hub`, `a_key_name`, `a_key`)
 if err != nil {
 	panic(err)
 }
-r, err := c.CreateReceiver(`$Default`, 0)
+ss := gohub.StorageSetting(`an_account`, `a_key`)
+r, err := c.CreateReceiver(0, ss, gohub.ConsumerGroup(`$Default`), gohub.PrefetchCount(1), gohub.CheckPointAfter(5))
 if err != nil {
     panic(err)
 }
