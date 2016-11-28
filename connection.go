@@ -121,13 +121,19 @@ func (c*evhConnection) newReceiver(rs receiverSetting) (EVHReceiver, error) {
 	if err != nil {
 		return nil, err
 	}
+	p := newPartition(c.hub, rs.consumerGroup, rs.partitionId, newAzureStorage(rs.storageSetting))
+	err = p.createStorageIfNotExist(c.hub, rs.consumerGroup, rs.partitionId)
+	_, err = p.offset(c.hub, rs.consumerGroup, rs.partitionId)
+	if err != nil {
+		return nil, err
+	}
 	return &evhReceiver{
 		receiver: r,
 		hub: c.hub,
 		consumerGroup: rs.consumerGroup,
 		partitionId: rs.partitionId,
 		checkpointAfter: rs.checkPointAfter,
-		p: newPartition(c.hub, rs.consumerGroup, rs.partitionId, newAzureStorage(rs.storageSetting)),
+		p: p,
 	}, nil
 }
 

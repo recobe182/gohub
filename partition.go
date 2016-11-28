@@ -6,17 +6,29 @@ import (
 
 
 type storage interface {
-	getCheckpoint(hub, cg, pid string) (*checkpoint, error)
-	saveCheckpoint(cp *checkpoint) error
+	createStorage(hub, cg, pid string) error
+	getCheckpoint(hub, cg, pid string) (checkpoint, error)
+	saveCheckpoint(hub, cg, pid string, cp checkpoint) error
 }
 
-type checkpoint struct {
+type lease struct {
 	Offset string `json:"offset"`
 	SeqNo int64 `json:"sequenceNumber"`
 	PartitionId string `json:"partitionId"`
+	Epoch int64 `json:"epoch"`
+	Owner string `json:"owner"`
+	Token string `json:"token"`
+}
+
+type checkpoint struct {
+	offset string
+	seqNo int64
+	partitionId string
 }
 
 type partition interface {
+	createStorageIfNotExist(hub, cg, pid string) error
+	offset(hub, cg, pid string) (string, error)
 	checkpoint(m *ReceiveMessage) error
 }
 
@@ -39,12 +51,12 @@ func (p*defaultPartition) checkpoint(m *ReceiveMessage) error {
 		return err
 	}
 	log.WithFields(log.Fields{
-		"Partition": cp.PartitionId,
-		"Offset": cp.Offset,
-		"SeqNo": cp.SeqNo,
+		"Partition": cp.partitionId,
+		"Offset": cp.offset,
+		"SeqNo": cp.seqNo,
 	}).Debug("Retrieved checkpoint")
-	if m.SeqNo >= cp.SeqNo {
-		err := p.s.saveCheckpoint(cp)
+	if m.SeqNo >= cp.seqNo {
+		err := p.s.saveCheckpoint(p.hub, p.cg, p.pid, cp)
 		if err != nil {
 			log.Error("Unable to save checkpoint.")
 			return err
@@ -56,4 +68,16 @@ func (p*defaultPartition) checkpoint(m *ReceiveMessage) error {
 		}).Debug("Checkpointed")
 	}
 	return nil
+}
+
+func (p*defaultPartition) offset(hub, cg, pid string) (string, error) {
+	cp, err := p.s.getCheckpoint(hub, cg, pid)
+	if err != nil {
+		return ``, err
+	}
+	return cp.offset, err
+}
+
+func (p*defaultPartition) createStorageIfNotExist(hub, cg, pid string) error {
+	return p.s.createStorage(hub, cg, pid)
 }
