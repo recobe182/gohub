@@ -15,6 +15,8 @@ const (
 	amqpsPort string = `5671`
 	receivePattern string = `%v/ConsumerGroups/%v/Partitions/%v`
 	hostPattern string = `%v.servicebus.windows.net`
+	selectorFilter string = `apache.org:selector-filter:string`
+	offsetFilter string = `amqp.annotation.x-opt-offset > %v`
 )
 
 // EVHConnection is a connection interface which connect to Azure Event Hub.
@@ -113,20 +115,25 @@ func (c*evhConnection) CreateReceiver(pid int, ss storageSetting, opts ...Receiv
 }
 
 func (c*evhConnection) newReceiver(rs receiverSetting) (EVHReceiver, error) {
+	p := newPartition(c.hub, rs.consumerGroup, rs.partitionId, newAzureStorage(rs.storageSetting))
+	err := p.createStorageIfNotExist(c.hub, rs.consumerGroup, rs.partitionId)
+	o, err := p.offset(c.hub, rs.consumerGroup, rs.partitionId)
+	if err != nil {
+		return nil, err
+	}
+
+	m := make(map[string]string)
+	m[selectorFilter] = fmt.Sprintf(offsetFilter, o)
 	r, err := c.conn.Receiver(
 		electron.Source(fmt.Sprintf(receivePattern, c.hub, rs.consumerGroup, rs.partitionId)),
 		electron.Prefetch(true),
 		electron.Capacity(rs.prefetchCount),
+		electron.Filter(m),
 	)
 	if err != nil {
 		return nil, err
 	}
-	p := newPartition(c.hub, rs.consumerGroup, rs.partitionId, newAzureStorage(rs.storageSetting))
-	err = p.createStorageIfNotExist(c.hub, rs.consumerGroup, rs.partitionId)
-	_, err = p.offset(c.hub, rs.consumerGroup, rs.partitionId)
-	if err != nil {
-		return nil, err
-	}
+
 	return &evhReceiver{
 		receiver: r,
 		hub: c.hub,

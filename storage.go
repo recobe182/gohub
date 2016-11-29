@@ -76,7 +76,11 @@ func (s*azureStorage) getCheckpoint(hub, cg, pid string) (checkpoint, error) {
 	if err != nil {
 		return checkpoint{}, err
 	}
-	log.WithFields(log.Fields{"Offset": l.Offset, "SeqNo": l.SeqNo}).Debug("Got latest offset")
+	log.WithFields(log.Fields{
+		"Offset": l.Offset,
+		"SeqNo": l.SeqNo,
+		"PartitionID": l.PartitionId},
+	).Debug("Got latest offset")
 	return checkpoint{offset: l.Offset, seqNo: l.SeqNo, partitionId: l.PartitionId}, nil
 }
 
@@ -116,7 +120,8 @@ func (s*azureStorage) createNewLease(hub, cg, pid string) error {
 	l.Offset = "0"
 	l.SeqNo = 0
 	l.Epoch = 0
-	l.Owner = ``
+	l.PartitionId = pid
+	l.Owner = `gohub`
 	l.Token = ``
 	if err := s.saveLease(hub, cg, pid, l); err != nil {
 		return err

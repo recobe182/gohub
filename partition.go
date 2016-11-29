@@ -50,13 +50,12 @@ func (p*defaultPartition) checkpoint(m *ReceiveMessage) error {
 		log.Error("Unable to get checkpoint.")
 		return err
 	}
-	log.WithFields(log.Fields{
-		"Partition": cp.partitionId,
-		"Offset": cp.offset,
-		"SeqNo": cp.seqNo,
-	}).Debug("Retrieved checkpoint")
 	if m.SeqNo >= cp.seqNo {
-		err := p.s.saveCheckpoint(p.hub, p.cg, p.pid, cp)
+		ncp := checkpoint{}
+		ncp.offset = m.Offset
+		ncp.seqNo = m.SeqNo
+		ncp.partitionId = m.PartitionId
+		err := p.s.saveCheckpoint(p.hub, p.cg, p.pid, ncp)
 		if err != nil {
 			log.Error("Unable to save checkpoint.")
 			return err
