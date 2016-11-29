@@ -54,6 +54,7 @@ Unfortunately proton-c is not available for Mac OSX, please use [pre-built docke
 If you want to build an application
 ```
 docker pull recobe/ubuntu:16.10-proton-go
+docker run --rm -it -v "$GOPATH":/go recobe/ubuntu:16.10-proton-go bash
 ```
 then map your $GOPATH to /go.
 
