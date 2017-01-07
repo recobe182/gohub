@@ -16,19 +16,19 @@ const (
 type EVHSender interface {
 	// SendSync sends a message and blocks until the message is acknowledged by the remote receiver.
 	// Returns an error or nil in case of success.
-	SendSync(msg string) error
+	SendSync(msg string, id interface{}) error
 
 	// SendSyncTimeout sends a message and blocks until the message is acknowledged by the remote receiver.
 	// If the sending process exceeds the timeout, Error will be returned.
 	// Returns an error or nil in case of success.
-	SendSyncTimeout(msg string, t time.Duration) error
+	SendSyncTimeout(msg string, t time.Duration, id interface{}) error
 
 	// SendAsync puts a message in the send buffer and returns immediately.
 	// If error occurs, an error object will be sent to out channel.
 	// Note: can block if there is no space to buffer the message.
-	SendAsync(msg string, out chan <- error)
+	SendAsync(msg string, out chan <- error, id interface{})
 
-	SendAsyncTimeout(msg string, out chan <- error, t time.Duration)
+	SendAsyncTimeout(msg string, out chan <- error, t time.Duration, id interface{})
 }
 
 // EVHSender implementation.

@@ -64,8 +64,5 @@ docker pull recobe/ubuntu:16.10-proton
 ```
 
 ## Development plan
-- [ ] Integration with Azure blob storage.
-- [ ] Receiving message with partition offset.
-- [ ] Partition checkpoint.
 - [ ] Sending to a selected partition.
 - [ ] Automatic reconnect.
