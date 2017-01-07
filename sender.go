@@ -8,7 +8,8 @@ import (
 )
 
 const (
-	utf_8 string = `UTF-8`
+	utf_8		string = `UTF-8`
+	messageIdProp	string = `message-id`
 )
 
 // EVHSender is a sender interface use to send a message to Azure Event Hub.
@@ -38,28 +39,28 @@ type evhSender struct {
 type sendSync func() electron.Outcome
 type sendAsync func(out chan <- electron.Outcome)
 
-func (s*evhSender) SendSync(msg string) error {
+func (s*evhSender) SendSync(msg string, id interface{}) error {
 	return sendSyncCore(func() electron.Outcome {
-		return s.sender.SendSync(getAmqpMessage(msg))
+		return s.sender.SendSync(getAmqpMessage(msg, id))
 	})
 }
 
-func (s*evhSender) SendSyncTimeout(msg string, t time.Duration) error {
+func (s*evhSender) SendSyncTimeout(msg string, t time.Duration, id interface{}) error {
 	return sendSyncCore(func() electron.Outcome {
-		return s.sender.SendSyncTimeout(getAmqpMessage(msg), t)
+		return s.sender.SendSyncTimeout(getAmqpMessage(msg, id), t)
 	})
 }
 
-func (s*evhSender) SendAsync(msg string, out chan <- error) {
+func (s*evhSender) SendAsync(msg string, out chan <- error, id interface{}) {
 	go sendAsyncCore(func(o chan <- electron.Outcome) {
-		m := getAmqpMessage(msg)
+		m := getAmqpMessage(msg, id)
 		s.sender.SendAsync(m, o, m.Body())
 	}, out)
 }
 
-func (s*evhSender) SendAsyncTimeout(msg string, out chan <- error, t time.Duration) {
+func (s*evhSender) SendAsyncTimeout(msg string, out chan <- error, t time.Duration, id interface{}) {
 	go sendAsyncCore(func(o chan <- electron.Outcome) {
-		m := getAmqpMessage(msg)
+		m := getAmqpMessage(msg, id)
 		s.sender.SendAsyncTimeout(m, o, m.Body(), t)
 	}, out)
 }
@@ -81,10 +82,15 @@ func sendAsyncCore(s sendAsync, out chan <- error) {
 	out <- o.Error
 }
 
-func getAmqpMessage(msg string) amqp.Message{
+func getAmqpMessage(msg string, id interface{}) amqp.Message{
 	m := amqp.NewMessage()
 	m.SetInferred(true)
 	m.SetContentEncoding(utf_8)
 	m.Marshal([]byte(msg))
+	if id != nil {
+		prop := make(map[string]interface{})
+		prop[messageIdProp] = id
+		m.SetProperties(prop)
+	}
 	return m
 }
