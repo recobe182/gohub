@@ -1,0 +1,74 @@
+From 33e0d5e5f1ab0694e3fcf6c7b2a4fdc667abcbe0 Mon Sep 17 00:00:00 2001
+From: "Usava, Paladetch | Bee | GCSD" <paladetch.usava@rakuten.com>
+Date: Tue, 29 Nov 2016 13:04:46 +0900
+Subject: [PATCH] Add LinkOption to set filter
+
+Some message brokers like Azure Event Hub requires a client to set filter header to determine where to start consuming messages (offset).
+---
+ electron/link.go       |  5 +++++
+ proton/wrappers_gen.go | 19 +++++++++++++++++++
+ 2 files changed, 24 insertions(+)
+
+diff --git a/electron/link.go b/electron/link.go
+index 1d17894..4744310 100644
+--- a/electron/link.go
++++ b/electron/link.go
+@@ -80,6 +80,9 @@ func Capacity(n int) LinkOption { return func(l *linkSettings) { l.capacity = n
+ // Prefetch returns a LinkOption that sets a receivers pre-fetch flag. Not relevant for a sender.
+ func Prefetch(p bool) LinkOption { return func(l *linkSettings) { l.prefetch = p } }
+ 
++// Filter returns a LinkOption that sets a filter.
++func Filter(m map[string]string) LinkOption { return func(l *linkSettings) { l.filter = m } }
++
+ // AtMostOnce returns a LinkOption that sets "fire and forget" mode, messages
+ // are sent but no acknowledgment is received, messages can be lost if there is
+ // a network failure. Sets SndSettleMode=SendSettled and RcvSettleMode=RcvFirst
+@@ -130,6 +133,7 @@ type linkSettings struct {
+ 	rcvSettle RcvSettleMode
+ 	capacity  int
+ 	prefetch  bool
++	filter	map[string]string
+ 	session   *session
+ 	pLink     proton.Link
+ }
+@@ -175,6 +179,7 @@ func makeLocalLink(sn *session, isSender bool, setting ...LinkOption) (linkSetti
+ 		return l, fmt.Errorf("cannot create link %s", l.pLink)
+ 	}
+ 	l.pLink.Source().SetAddress(l.source)
++	l.pLink.Source().SetFilter(l.filter)
+ 	l.pLink.Target().SetAddress(l.target)
+ 	l.pLink.SetSndSettleMode(proton.SndSettleMode(l.sndSettle))
+ 	l.pLink.SetRcvSettleMode(proton.RcvSettleMode(l.rcvSettle))
+diff --git a/proton/wrappers_gen.go b/proton/wrappers_gen.go
+index 19bfde2..06fde81 100644
+--- a/proton/wrappers_gen.go
++++ b/proton/wrappers_gen.go
+@@ -611,6 +611,25 @@ func (t Terminus) SetAddress(address string) int {
+ 
+ 	return int(C.pn_terminus_set_address(t.pn, addressC))
+ }
++func (t Terminus) SetFilter(filter map[string]string) bool {
++	d := Data{C.pn_terminus_filter(t.pn)}
++	for k, v := range filter {
++		fk := C.CString(k)
++		fv := C.CString(v)
++
++		C.pn_data_put_map(d.pn)
++		C.pn_data_enter(d.pn)
++		C.pn_data_put_symbol(d.pn, C.pn_bytes(C.size_t(len(k)), fk))
++		C.pn_data_put_described(d.pn)
++		C.pn_data_enter(d.pn)
++		C.pn_data_put_symbol(d.pn, C.pn_bytes(C.size_t(len(k)), fk))
++		C.pn_data_put_string(d.pn, C.pn_bytes(C.size_t(len(v)), fv))
++
++		C.free(unsafe.Pointer(fk))
++		C.free(unsafe.Pointer(fv))
++	}
++	return bool(C.pn_data_exit(d.pn));
++}
+ func (t Terminus) SetDistributionMode(mode DistributionMode) int {
+ 	return int(C.pn_terminus_set_distribution_mode(t.pn, C.pn_distribution_mode_t(mode)))
+ }
+-- 
+2.4.9 (Apple Git-60)
+
