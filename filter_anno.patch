@@ -1,14 +1,41 @@
-From 33e0d5e5f1ab0694e3fcf6c7b2a4fdc667abcbe0 Mon Sep 17 00:00:00 2001
-From: "Paladetch Usavasereelert" <paladetch.u@gmail.com>
-Date: Tue, 29 Nov 2016 13:04:46 +0900
-Subject: [PATCH] Add LinkOption to set filter
+From 4c1f8a36696db8cc34663b1e518fa10be5bafbba Mon Sep 17 00:00:00 2001
+From: Paladetch Usavasereelert <paladetch.u@gmail.com>
+Date: Sat, 14 Jan 2017 13:42:50 +0900
+Subject: [PATCH] Add filter and fix annotation
 
-Some message brokers like Azure Event Hub requires a client to set filter header to determine where to start consuming messages (offset).
 ---
+ amqp/message.go        | 16 +++++++++++++++-
  electron/link.go       |  5 +++++
- proton/wrappers_gen.go | 19 +++++++++++++++++++
- 2 files changed, 24 insertions(+)
+ proton/wrappers_gen.go | 17 +++++++++++++++++
+ 3 files changed, 37 insertions(+), 1 deletion(-)
 
+diff --git a/amqp/message.go b/amqp/message.go
+index 753682e..2b0a281 100644
+--- a/amqp/message.go
++++ b/amqp/message.go
+@@ -302,7 +302,21 @@ func (m *message) SetReplyToGroupId(s string) {
+ func (m *message) SetInstructions(v map[string]interface{}) {
+ 	setData(v, C.pn_message_instructions(m.pn))
+ }
+-func (m *message) SetAnnotations(v map[string]interface{}) { setData(v, C.pn_message_annotations(m.pn)) }
++func (m *message) SetAnnotations(v map[string]interface{}) {
++	d := C.pn_message_annotations(m.pn)
++	for k, v := range v {
++		fk := C.CString(k)
++		vstr := v.(string)
++		fv := C.CString(vstr)
++		C.pn_data_put_map(d)
++		C.pn_data_enter(d)
++		C.pn_data_put_symbol(d, C.pn_bytes(C.size_t(len(k)), fk))
++		C.pn_data_put_string(d, C.pn_bytes(C.size_t(len(vstr)), fv))
++		C.free(unsafe.Pointer(fk))
++		C.free(unsafe.Pointer(fv))
++	}
++	C.pn_data_exit(d)
++}
+ func (m *message) SetProperties(v map[string]interface{})  { setData(v, C.pn_message_properties(m.pn)) }
+ 
+ // Marshal/Unmarshal body
 diff --git a/electron/link.go b/electron/link.go
 index 1d17894..4744310 100644
 --- a/electron/link.go
@@ -40,10 +67,10 @@ index 1d17894..4744310 100644
  	l.pLink.SetSndSettleMode(proton.SndSettleMode(l.sndSettle))
  	l.pLink.SetRcvSettleMode(proton.RcvSettleMode(l.rcvSettle))
 diff --git a/proton/wrappers_gen.go b/proton/wrappers_gen.go
-index 19bfde2..06fde81 100644
+index 19bfde2..16e2fba 100644
 --- a/proton/wrappers_gen.go
 +++ b/proton/wrappers_gen.go
-@@ -611,6 +611,25 @@ func (t Terminus) SetAddress(address string) int {
+@@ -611,6 +611,23 @@ func (t Terminus) SetAddress(address string) int {
  
  	return int(C.pn_terminus_set_address(t.pn, addressC))
  }
@@ -52,7 +79,6 @@ index 19bfde2..06fde81 100644
 +	for k, v := range filter {
 +		fk := C.CString(k)
 +		fv := C.CString(v)
-+
 +		C.pn_data_put_map(d.pn)
 +		C.pn_data_enter(d.pn)
 +		C.pn_data_put_symbol(d.pn, C.pn_bytes(C.size_t(len(k)), fk))
@@ -60,7 +86,6 @@ index 19bfde2..06fde81 100644
 +		C.pn_data_enter(d.pn)
 +		C.pn_data_put_symbol(d.pn, C.pn_bytes(C.size_t(len(k)), fk))
 +		C.pn_data_put_string(d.pn, C.pn_bytes(C.size_t(len(v)), fv))
-+
 +		C.free(unsafe.Pointer(fk))
 +		C.free(unsafe.Pointer(fv))
 +	}
@@ -70,5 +95,5 @@ index 19bfde2..06fde81 100644
  	return int(C.pn_terminus_set_distribution_mode(t.pn, C.pn_distribution_mode_t(mode)))
  }
 -- 
-2.4.9 (Apple Git-60)
+2.10.1 (Apple Git-78)
 
