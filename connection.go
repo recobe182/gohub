@@ -8,6 +8,7 @@ import (
 	"math/rand"
 	"fmt"
 	log "github.com/Sirupsen/logrus"
+	"strings"
 )
 
 const (
@@ -57,6 +58,21 @@ func New(ns, hub, sasN, sasK string) (*evhConnection, error) {
 		log.WithFields(log.Fields{"Host": conn.host, "Hub": conn.hub, }).Debug("Connected")
 		return conn, nil
 	}
+}
+
+/// NewWithConnectionString a new Azure Event Hub connection instance by using connection string.
+func NewWithConnectionString(connStr string) (*evhConnection, error) {
+	var ns, hub, sasN, sasK string
+	m := make(map[string]string)
+	for _, v := range strings.Split(connStr, ";") {
+		kv := strings.Split(v, "=")
+		m[kv[0]] = kv[1]
+	}
+	ns = strings.Split(strings.Split(m[`Endpoint`], ".")[0], "//")[1]
+	hub = m[`EntityPath`]
+	sasN = m[`SharedAccessKeyName`]
+	sasK = m[`SharedAccessKey`]
+	return New(ns, hub, sasN, sasK)
 }
 
 func (c*evhConnection) connect() error {
