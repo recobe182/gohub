@@ -9,6 +9,7 @@ import (
 	"fmt"
 	log "github.com/Sirupsen/logrus"
 	"strings"
+	"time"
 )
 
 const (
@@ -103,6 +104,7 @@ func (c*evhConnection) connect() error {
 		electron.VirtualHost(c.host),
 		electron.User(c.sasN),
 		electron.Password([]byte(c.sasK)),
+		electron.Heartbeat(60000 * time.Millisecond),
 	)
 	if err != nil {
 		return err
