@@ -22,7 +22,7 @@ type receiverSetting struct {
 	consumerGroup string
 	checkPointAfter int
 	prefetchCount int
-	storageSetting storageSetting
+	storageSetting StorageSetting
 }
 
 // ConsumerGroup returns a ReceiverOption that sets consumer group.

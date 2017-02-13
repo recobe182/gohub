@@ -14,25 +14,20 @@ const (
 	contentMd5 string = `Content-MD5`
 )
 
-// StorageSetting returns setting for Azure Storage.
-func StorageSetting(name, key string) storageSetting {
-	return storageSetting{name: name, key: key}
-}
-
-type storageSetting struct {
-	name string
-	key string
+type StorageSetting struct {
+	Name string
+	Key string
 }
 
 type azureStorage struct {
-	ss storageSetting
+	ss StorageSetting
 	c azure.Client
 }
 
-func newAzureStorage(ss storageSetting) *azureStorage {
+func newAzureStorage(ss StorageSetting) *azureStorage {
 	c, err := azure.NewClient(
-		ss.name,
-		ss.key,
+		ss.Name,
+		ss.Key,
 		azure.DefaultBaseURL,
 		azure.DefaultAPIVersion,
 		false,

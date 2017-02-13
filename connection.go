@@ -26,7 +26,7 @@ type EVHConnection interface {
 	CreateSender() (EVHSender, error)
 
 	// CreateReceiver creates a new receiver on the DefaultSession.
-	CreateReceiver(p int, ss storageSetting, opts ...ReceiverOption) (EVHReceiver, error)
+	CreateReceiver(p int, ss StorageSetting, opts ...ReceiverOption) (EVHReceiver, error)
 
 	// Close the connection.
 	Close() error
@@ -34,12 +34,14 @@ type EVHConnection interface {
 
 // EVHConnection implementation.
 type evhConnection struct {
-	host string
-	hub string
-	sasN string
-	sasK string
+	host 	string
+	hub 	string
+	sasN 	string
+	sasK 	string
 
-	conn electron.Connection
+	conn	electron.Connection
+	senders	[]electron.Sender
+	recvs	[]electron.Receiver
 }
 
 // New creates a new Azure Event Hub connection instance.
@@ -64,9 +66,15 @@ func New(ns, hub, sasN, sasK string) (*evhConnection, error) {
 func NewWithConnectionString(connStr string) (*evhConnection, error) {
 	var ns, hub, sasN, sasK string
 	m := make(map[string]string)
+	l := []string{"Endpoint=", "SharedAccessKeyName=", "SharedAccessKey=", "EntityPath="}
 	for _, v := range strings.Split(connStr, ";") {
-		kv := strings.Split(v, "=")
-		m[kv[0]] = kv[1]
+		for _, pn := range l {
+			index := strings.Index(v, pn)
+			if index >= 0 {
+				m[strings.TrimSuffix(pn, "=")] = v[0 + len(pn):]
+				break
+			}
+		}
 	}
 	ns = strings.Split(strings.Split(m[`Endpoint`], ".")[0], "//")[1]
 	hub = m[`EntityPath`]
@@ -100,6 +108,8 @@ func (c*evhConnection) connect() error {
 		return err
 	}
 	c.conn = eConn
+	c.senders = []electron.Sender{}
+	c.recvs = []electron.Receiver{}
 	return nil
 }
 
@@ -113,10 +123,11 @@ func (c*evhConnection) CreateSender() (EVHSender, error) {
 	if err != nil {
 		return nil, err
 	}
+	c.senders = append(c.senders, s)
 	return &evhSender{sender: s}, nil
 }
 
-func (c*evhConnection) CreateReceiver(pid int, ss storageSetting, opts ...ReceiverOption) (EVHReceiver, error) {
+func (c*evhConnection) CreateReceiver(pid int, ss StorageSetting, opts ...ReceiverOption) (EVHReceiver, error) {
 	rs := receiverSetting{
 		partitionId: strconv.Itoa(pid),
 		consumerGroup: defaultConsumerGroup,
@@ -149,7 +160,7 @@ func (c*evhConnection) newReceiver(rs receiverSetting) (EVHReceiver, error) {
 	if err != nil {
 		return nil, err
 	}
-
+	c.recvs = append(c.recvs, r)
 	return &evhReceiver{
 		receiver: r,
 		hub: c.hub,
@@ -162,6 +173,18 @@ func (c*evhConnection) newReceiver(rs receiverSetting) (EVHReceiver, error) {
 
 func (c*evhConnection) Close() error {
 	var err error
+	for _, sender := range c.senders {
+		sender.Close(err)
+		if err != nil {
+			return err
+		}
+	}
+	for _, recv := range c.recvs {
+		recv.Close(err)
+		if err != nil {
+			return err
+		}
+	}
 	c.conn.Close(err)
 	return err
 }
