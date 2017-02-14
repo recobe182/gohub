@@ -71,6 +71,9 @@ func (s*azureStorage) getCheckpoint(hub, cg, pid string) (checkpoint, error) {
 	if err != nil {
 		return checkpoint{}, err
 	}
+	if l.Offset == "" {
+		l.Offset = "-1"
+	}
 	log.WithFields(log.Fields{
 		"Offset": l.Offset,
 		"SeqNo": l.SeqNo,
