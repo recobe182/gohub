@@ -134,7 +134,6 @@ func (c*evhConnection) CreateReceiver(pid int, ss StorageSetting, opts ...Receiv
 		partitionId: strconv.Itoa(pid),
 		consumerGroup: defaultConsumerGroup,
 		prefetchCount: defaultPrefetchCount,
-		checkPointAfter: defaultCheckpointAfter,
 		storageSetting: ss,
 	}
 	for _, set := range opts {
@@ -144,15 +143,15 @@ func (c*evhConnection) CreateReceiver(pid int, ss StorageSetting, opts ...Receiv
 }
 
 func (c*evhConnection) newReceiver(rs receiverSetting) (EVHReceiver, error) {
-	p := newPartition(c.hub, rs.consumerGroup, rs.partitionId, newAzureStorage(rs.storageSetting))
-	err := p.createStorageIfNotExist(c.hub, rs.consumerGroup, rs.partitionId)
-	o, err := p.offset(c.hub, rs.consumerGroup, rs.partitionId)
+	as := newAzureStorage(rs.storageSetting)
+	as.CreateStorage(c.hub, rs.consumerGroup, rs.partitionId)
+	cp, err := as.GetCheckpoint(c.hub, rs.consumerGroup, rs.partitionId)
 	if err != nil {
 		return nil, err
 	}
 
 	m := make(map[string]string)
-	m[selectorFilter] = fmt.Sprintf(offsetFilter, o)
+	m[selectorFilter] = fmt.Sprintf(offsetFilter, cp.offset)
 	r, err := c.conn.Receiver(
 		electron.Source(fmt.Sprintf(receivePattern, c.hub, rs.consumerGroup, rs.partitionId)),
 		electron.Prefetch(true),
@@ -168,8 +167,7 @@ func (c*evhConnection) newReceiver(rs receiverSetting) (EVHReceiver, error) {
 		hub: c.hub,
 		consumerGroup: rs.consumerGroup,
 		partitionId: rs.partitionId,
-		checkpointAfter: rs.checkPointAfter,
-		p: p,
+		p: newPartitionContext(c.hub, rs.consumerGroup, rs.partitionId, newAzureStorage(rs.storageSetting)),
 	}, nil
 }
 

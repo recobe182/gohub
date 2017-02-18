@@ -19,6 +19,27 @@ type StorageSetting struct {
 	Key string
 }
 
+type lease struct {
+	Offset string `json:"offset"`
+	SeqNo int64 `json:"sequenceNumber"`
+	PartitionId string `json:"partitionId"`
+	Epoch int64 `json:"epoch"`
+	Owner string `json:"owner"`
+	Token string `json:"token"`
+}
+
+type checkpoint struct {
+	offset string
+	seqNo int64
+}
+
+
+type storage interface {
+	CreateStorage(hub, cg, pid string) error
+	GetCheckpoint(hub, cg, pid string) (checkpoint, error)
+	SaveCheckpoint(hub, cg, pid string, cp checkpoint) error
+}
+
 type azureStorage struct {
 	ss StorageSetting
 	c azure.Client
@@ -42,7 +63,7 @@ func newAzureStorage(ss StorageSetting) *azureStorage {
 	return a
 }
 
-func (s*azureStorage) createStorage(hub, cg, pid string) error {
+func (s*azureStorage) CreateStorage(hub, cg, pid string) error {
 	bs := s.c.GetBlobService()
 	_, err := bs.CreateContainerIfNotExists(hub, azure.ContainerAccessTypeBlob)
 	if err != nil {
@@ -66,7 +87,7 @@ func (s*azureStorage) createStorage(hub, cg, pid string) error {
 	return nil
 }
 
-func (s*azureStorage) getCheckpoint(hub, cg, pid string) (checkpoint, error) {
+func (s*azureStorage) GetCheckpoint(hub, cg, pid string) (checkpoint, error) {
 	l, err := s.getLease(hub, cg, pid)
 	if err != nil {
 		return checkpoint{}, err
@@ -79,10 +100,10 @@ func (s*azureStorage) getCheckpoint(hub, cg, pid string) (checkpoint, error) {
 		"SeqNo": l.SeqNo,
 		"PartitionID": l.PartitionId},
 	).Debug("Got latest offset")
-	return checkpoint{offset: l.Offset, seqNo: l.SeqNo, partitionId: l.PartitionId}, nil
+	return checkpoint{offset: l.Offset, seqNo: l.SeqNo}, nil
 }
 
-func (s*azureStorage) saveCheckpoint(hub, cg, pid string, cp checkpoint) error {
+func (s*azureStorage) SaveCheckpoint(hub, cg, pid string, cp checkpoint) error {
 	l, err := s.getLease(hub, cg, pid)
 	if err != nil {
 		return nil
@@ -115,7 +136,7 @@ func (s*azureStorage) getLease(hub, cg, pid string) (lease, error) {
 
 func (s*azureStorage) createNewLease(hub, cg, pid string) error {
 	l := lease{}
-	l.Offset = "0"
+	l.Offset = "-1"
 	l.SeqNo = 0
 	l.Epoch = 0
 	l.PartitionId = pid

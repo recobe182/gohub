@@ -11,7 +11,6 @@ const (
 	sequenceNumber string = `x-opt-sequence-number`
 	defaultConsumerGroup string = `$Default`
 	defaultPrefetchCount int = 999
-	defaultCheckpointAfter int = 100
 )
 
 // ReceiverOption can be passed when creating a receiver to set optional configuration.
@@ -20,16 +19,12 @@ type ReceiverOption func(*receiverSetting)
 type receiverSetting struct {
 	partitionId string
 	consumerGroup string
-	checkPointAfter int
 	prefetchCount int
 	storageSetting StorageSetting
 }
 
 // ConsumerGroup returns a ReceiverOption that sets consumer group.
 func ConsumerGroup(s string) ReceiverOption { return func(l *receiverSetting) { l.consumerGroup = s } }
-
-// CheckPointAfter returns a ReceiverOption that sets check point after receive a specific amount of messages.
-func CheckPointAfter(i int) ReceiverOption { return func(l *receiverSetting) { l.checkPointAfter = i } }
 
 // PrefetchCount returns a ReceiverOption that sets prefetch count.
 func PrefetchCount(i int) ReceiverOption { return func(l *receiverSetting) { l.prefetchCount = i } }
@@ -55,6 +50,8 @@ type ReceiveMessage struct {
 type EVHReceiver interface {
 	// Receive a message through out channel.
 	Receive(out chan <- ReceiveMessage)
+
+	Checkpoint(msg ReceiveMessage) error
 }
 
 // EVHReceiver implementation.
@@ -63,10 +60,8 @@ type evhReceiver struct {
 	hub string
 	consumerGroup string
 	partitionId string
-	checkpointAfter int
-	checkpointCount int
 
-	p partition
+	p PartitionContext
 }
 
 func (r*evhReceiver) Receive(out chan <- ReceiveMessage) {
@@ -79,7 +74,7 @@ func (r*evhReceiver) Receive(out chan <- ReceiveMessage) {
 				Msg: string(rm.Message.Body().(amqp.Binary)),
 				Offset: rm.Message.Annotations()[offset].(string),
 				SeqNo: rm.Message.Annotations()[sequenceNumber].(int64),
-				PartitionId: r.partitionId,
+				PartitionId: r.p.GetId(),
 				Error: nil,
 			}
 			log.WithFields(log.Fields{
@@ -89,19 +84,10 @@ func (r*evhReceiver) Receive(out chan <- ReceiveMessage) {
 				"Message": ret.Msg,
 			}).Debug("Received")
 			out <- ret
-			r.checkpoint(&ret)
 		}
 	}
 }
 
-func (r*evhReceiver) checkpoint(rm *ReceiveMessage) {
-	r.checkpointCount++
-	if (r.checkpointCount % r.checkpointAfter) == 0 {
-		err := r.p.checkpoint(rm)
-		if err != nil {
-			log.Error(err)
-		} else {
-			r.checkpointCount = 0
-		}
-	}
+func (r*evhReceiver) Checkpoint(msg ReceiveMessage) error {
+	return r.p.Checkpoint(msg.Offset, msg.SeqNo)
 }
