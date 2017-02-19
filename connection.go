@@ -129,12 +129,11 @@ func (c*evhConnection) CreateSender() (EVHSender, error) {
 	return &evhSender{sender: s}, nil
 }
 
-func (c*evhConnection) CreateReceiver(pid int, ss StorageSetting, opts ...ReceiverOption) (EVHReceiver, error) {
+func (c*evhConnection) CreateReceiver(pid int, opts ...ReceiverOption) (EVHReceiver, error) {
 	rs := receiverSetting{
 		partitionId: strconv.Itoa(pid),
 		consumerGroup: defaultConsumerGroup,
 		prefetchCount: defaultPrefetchCount,
-		storageSetting: ss,
 	}
 	for _, set := range opts {
 		set(&rs)
@@ -143,15 +142,22 @@ func (c*evhConnection) CreateReceiver(pid int, ss StorageSetting, opts ...Receiv
 }
 
 func (c*evhConnection) newReceiver(rs receiverSetting) (EVHReceiver, error) {
-	as := newAzureStorage(rs.storageSetting)
-	as.CreateStorage(c.hub, rs.consumerGroup, rs.partitionId)
-	cp, err := as.GetCheckpoint(c.hub, rs.consumerGroup, rs.partitionId)
-	if err != nil {
-		return nil, err
+	m := make(map[string]string)
+	var as storage
+	if rs.mode == FromLastOffset {
+		as = newAzureStorage(rs.storageSetting)
+		as.CreateStorage(c.hub, rs.consumerGroup, rs.partitionId)
+		cp, err := as.GetCheckpoint(c.hub, rs.consumerGroup, rs.partitionId)
+		if err != nil {
+			return nil, err
+		}
+		m[selectorFilter] = fmt.Sprintf(offsetFilter, cp.offset)
+	} else if rs.mode == FromNow {
+
+	} else {
+		panic(fmt.Sprintf("Invalid receiver mode. %v", rs.mode))
 	}
 
-	m := make(map[string]string)
-	m[selectorFilter] = fmt.Sprintf(offsetFilter, cp.offset)
 	r, err := c.conn.Receiver(
 		electron.Source(fmt.Sprintf(receivePattern, c.hub, rs.consumerGroup, rs.partitionId)),
 		electron.Prefetch(true),
@@ -161,13 +167,14 @@ func (c*evhConnection) newReceiver(rs receiverSetting) (EVHReceiver, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	c.recvs = append(c.recvs, r)
 	return &evhReceiver{
 		receiver: r,
 		hub: c.hub,
 		consumerGroup: rs.consumerGroup,
 		partitionId: rs.partitionId,
-		p: newPartitionContext(c.hub, rs.consumerGroup, rs.partitionId, newAzureStorage(rs.storageSetting)),
+		p: newPartitionContext(c.hub, rs.consumerGroup, rs.partitionId, as),
 	}, nil
 }
 
