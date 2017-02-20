@@ -3,7 +3,6 @@ package gohub
 import (
 	"qpid.apache.org/amqp"
 	"qpid.apache.org/electron"
-	log "github.com/Sirupsen/logrus"
 )
 
 const (
@@ -52,7 +51,7 @@ func FromLastOffset(ss StorageSetting) ReceiverOption {
 // ReceiveMessage is a message struct.
 type ReceiveMessage struct {
 	// Msg is a message body.
-	Msg string
+	Body []byte
 
 	// Offset is a partition offset.
 	Offset string
@@ -90,18 +89,12 @@ func (r*evhReceiver) Receive(out chan <- ReceiveMessage) PartitionContext {
 				break
 			} else {
 				ret := ReceiveMessage{
-					Msg: string(rm.Message.Body().(amqp.Binary)),
+					Body: []byte(rm.Message.Body().(amqp.Binary)),
 					Offset: rm.Message.Annotations()[offsetKey].(string),
 					SeqNo: rm.Message.Annotations()[sequenceNumberKey].(int64),
 					PartitionId: r.p.GetId(),
 					Error: nil,
 				}
-				log.WithFields(log.Fields{
-					"Partition": r.partitionId,
-					"Offset": ret.Offset,
-					"Seq No": ret.SeqNo,
-					"Message": ret.Msg,
-				}).Debug("Received")
 				out <- ret
 			}
 		}

@@ -7,7 +7,6 @@ import (
 	"crypto/tls"
 	"math/rand"
 	"fmt"
-	log "github.com/Sirupsen/logrus"
 	"strings"
 	"time"
 )
@@ -60,7 +59,6 @@ func New(ns, hub, sasN, sasK string) (*evhConnection, error) {
 	if err := conn.connect(); err != nil {
 		return nil, err
 	} else {
-		log.WithFields(log.Fields{"Host": conn.host, "Hub": conn.hub, }).Debug("Connected")
 		return conn, nil
 	}
 }

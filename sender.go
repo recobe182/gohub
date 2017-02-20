@@ -4,11 +4,9 @@ import (
 	"time"
 	"qpid.apache.org/amqp"
 	"qpid.apache.org/electron"
-	log "github.com/Sirupsen/logrus"
 )
 
 const (
-	utf_8		string = `UTF-8`
 	partitionKey	string = `x-opt-partition-key`
 )
 
@@ -16,31 +14,31 @@ const (
 type EVHSender interface {
 	// SendSync sends a message and blocks until the message is acknowledged by the remote receiver.
 	// Returns an error or nil in case of success.
-	SendSync(msg string) error
+	SendSync(body []byte) error
 
 	// SendSyncWithKey act like SendSync. In addition, you can specify partition key. A message with same partition key always sent to same partition.
-	SendSyncWithKey(msg string, pk string) error
+	SendSyncWithKey(body []byte, pk string) error
 
 	// SendSyncTimeout sends a message and blocks until the message is acknowledged by the remote receiver.
 	// If the sending process exceeds the timeout, Error will be returned.
 	// Returns an error or nil in case of success.
-	SendSyncTimeout(msg string, t time.Duration) error
+	SendSyncTimeout(body []byte, t time.Duration) error
 
 	// SendSyncTimeoutWithKey act like SendSyncTimeout. In addition, you can specify partition key. A message with same partition key always sent to same partition.
-	SendSyncTimeoutWithKey(msg string, t time.Duration, pk string) error
+	SendSyncTimeoutWithKey(body []byte, t time.Duration, pk string) error
 
 	// SendAsync puts a message in the send buffer and returns immediately.
 	// If error occurs, an error object will be sent to out channel.
 	// Note: can block if there is no space to buffer the message.
-	SendAsync(msg string, out chan <- error)
+	SendAsync(body []byte, out chan <- error)
 
 	// SendAsyncWithKey act like SendAsync. In addition, you can specify partition key. A message with same partition key always sent to same partition.
-	SendAsyncWithKey(msg string, out chan <- error, pk string)
+	SendAsyncWithKey(body []byte, out chan <- error, pk string)
 
-	SendAsyncTimeout(msg string, out chan <- error, t time.Duration)
+	SendAsyncTimeout(body []byte, out chan <- error, t time.Duration)
 
 	// SendAsyncTimeoutWithKey act like SendAsyncTimeout. In addition, you can specify partition key. A message with same partition key always sent to same partition.
-	SendAsyncTimeoutWithKey(msg string, out chan <- error, t time.Duration, pk string)
+	SendAsyncTimeoutWithKey(body []byte, out chan <- error, t time.Duration, pk string)
 }
 
 // EVHSender implementation.
@@ -51,54 +49,54 @@ type evhSender struct {
 type sendSync func() electron.Outcome
 type sendAsync func(out chan <- electron.Outcome)
 
-func (s*evhSender) SendSync(msg string) error {
+func (s*evhSender) SendSync(body []byte) error {
 	return sendSyncCore(func() electron.Outcome {
-		return s.sender.SendSync(getAmqpMessage(msg, nil))
+		return s.sender.SendSync(getAmqpMessage(body, nil))
 	})
 }
 
-func (s*evhSender) SendSyncWithKey(msg string, pk string) error {
+func (s*evhSender) SendSyncWithKey(body []byte, pk string) error {
 	return sendSyncCore(func() electron.Outcome {
-		return s.sender.SendSync(getAmqpMessage(msg, &pk))
+		return s.sender.SendSync(getAmqpMessage(body, &pk))
 	})
 }
 
-func (s*evhSender) SendSyncTimeout(msg string, t time.Duration) error {
+func (s*evhSender) SendSyncTimeout(body []byte, t time.Duration) error {
 	return sendSyncCore(func() electron.Outcome {
-		return s.sender.SendSyncTimeout(getAmqpMessage(msg, nil), t)
+		return s.sender.SendSyncTimeout(getAmqpMessage(body, nil), t)
 	})
 }
 
-func (s*evhSender) SendSyncTimeoutWithKey(msg string, t time.Duration, pk string) error {
+func (s*evhSender) SendSyncTimeoutWithKey(body []byte, t time.Duration, pk string) error {
 	return sendSyncCore(func() electron.Outcome {
-		return s.sender.SendSyncTimeout(getAmqpMessage(msg, &pk), t)
+		return s.sender.SendSyncTimeout(getAmqpMessage(body, &pk), t)
 	})
 }
 
-func (s*evhSender) SendAsync(msg string, out chan <- error) {
+func (s*evhSender) SendAsync(body []byte, out chan <- error) {
 	go sendAsyncCore(func(o chan <- electron.Outcome) {
-		m := getAmqpMessage(msg, nil)
+		m := getAmqpMessage(body, nil)
 		s.sender.SendAsync(m, o, m.Body())
 	}, out)
 }
 
-func (s*evhSender) SendAsyncWithKey(msg string, out chan <- error, pk string) {
+func (s*evhSender) SendAsyncWithKey(body []byte, out chan <- error, pk string) {
 	go sendAsyncCore(func(o chan <- electron.Outcome) {
-		m := getAmqpMessage(msg, &pk)
+		m := getAmqpMessage(body, &pk)
 		s.sender.SendAsync(m, o, m.Body())
 	}, out)
 }
 
-func (s*evhSender) SendAsyncTimeout(msg string, out chan <- error, t time.Duration) {
+func (s*evhSender) SendAsyncTimeout(body []byte, out chan <- error, t time.Duration) {
 	go sendAsyncCore(func(o chan <- electron.Outcome) {
-		m := getAmqpMessage(msg, nil)
+		m := getAmqpMessage(body, nil)
 		s.sender.SendAsyncTimeout(m, o, m.Body(), t)
 	}, out)
 }
 
-func (s*evhSender) SendAsyncTimeoutWithKey(msg string, out chan <- error, t time.Duration, pk string) {
+func (s*evhSender) SendAsyncTimeoutWithKey(body []byte, out chan <- error, t time.Duration, pk string) {
 	go sendAsyncCore(func(o chan <- electron.Outcome) {
-		m := getAmqpMessage(msg, &pk)
+		m := getAmqpMessage(body, &pk)
 		s.sender.SendAsyncTimeout(m, o, m.Body(), t)
 	}, out)
 }
@@ -108,7 +106,6 @@ func sendSyncCore(s sendSync) error {
 	if o.Error != nil {
 		return o.Error
 	}
-	log.WithFields(log.Fields{"Status": o.Status, "Value": o.Value}).Debug("Sent SYNC")
 	return nil
 }
 
@@ -116,15 +113,13 @@ func sendAsyncCore(s sendAsync, out chan <- error) {
 	sCh := make(chan electron.Outcome)
 	s(sCh)
 	o := <- sCh
-	log.WithFields(log.Fields{"Status": o.Status, "Value": o.Value}).Debug("Sent ASYNC")
 	out <- o.Error
 }
 
-func getAmqpMessage(msg string, pk *string) amqp.Message{
+func getAmqpMessage(body []byte, pk *string) amqp.Message{
 	m := amqp.NewMessage()
 	m.SetInferred(true)
-	m.SetContentEncoding(utf_8)
-	m.Marshal([]byte(msg))
+	m.Marshal(body)
 	if pk != nil {
 		a := make(map[string]interface{})
 		a[partitionKey] = *pk
