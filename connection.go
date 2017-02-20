@@ -13,12 +13,14 @@ import (
 )
 
 const (
-	network string = `tcp`
-	amqpsPort string = `5671`
-	receivePattern string = `%v/ConsumerGroups/%v/Partitions/%v`
-	hostPattern string = `%v.servicebus.windows.net`
-	selectorFilter string = `apache.org:selector-filter:string`
-	offsetFilter string = `amqp.annotation.x-opt-offset > %v`
+	network 			string = `tcp`
+	amqpsPort 			string = `5671`
+	receivePattern 			string = `%v/ConsumerGroups/%v/Partitions/%v`
+	hostPattern 			string = `%v.servicebus.windows.net`
+	selectorFilter 			string = `apache.org:selector-filter:string`
+	amqpAnnotationFormat 		string = `amqp.annotation.%v > '%v'`
+	offsetAnnotationName 		string = `x-opt-offset`
+	enqueuedTimeAnnotationName	string = `x-opt-enqueued-time`
 )
 
 // EVHConnection is a connection interface which connect to Azure Event Hub.
@@ -27,7 +29,7 @@ type EVHConnection interface {
 	CreateSender() (EVHSender, error)
 
 	// CreateReceiver creates a new receiver on the DefaultSession.
-	CreateReceiver(p int, ss StorageSetting, opts ...ReceiverOption) (EVHReceiver, error)
+	CreateReceiver(p int, opts ...ReceiverOption) (EVHReceiver, error)
 
 	// Close the connection.
 	Close() error
@@ -144,18 +146,18 @@ func (c*evhConnection) CreateReceiver(pid int, opts ...ReceiverOption) (EVHRecei
 func (c*evhConnection) newReceiver(rs receiverSetting) (EVHReceiver, error) {
 	m := make(map[string]string)
 	var as storage
-	if rs.mode == FromLastOffset {
-		as = newAzureStorage(rs.storageSetting)
+	if rs.storageSetting != nil {
+		as = newAzureStorage(*rs.storageSetting)
 		as.CreateStorage(c.hub, rs.consumerGroup, rs.partitionId)
 		cp, err := as.GetCheckpoint(c.hub, rs.consumerGroup, rs.partitionId)
 		if err != nil {
 			return nil, err
 		}
-		m[selectorFilter] = fmt.Sprintf(offsetFilter, cp.offset)
-	} else if rs.mode == FromNow {
-
+		m[selectorFilter] = fmt.Sprintf(amqpAnnotationFormat, offsetAnnotationName, cp.offset)
+	} else if rs.epochTimeInMillisec != nil {
+		m[selectorFilter] = fmt.Sprintf(amqpAnnotationFormat, enqueuedTimeAnnotationName, *rs.epochTimeInMillisec)
 	} else {
-		panic(fmt.Sprintf("Invalid receiver mode. %v", rs.mode))
+		panic(fmt.Sprintf("Invalid receiver configuration. No storage setting or epoch time in millisecond."))
 	}
 
 	r, err := c.conn.Receiver(

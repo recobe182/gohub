@@ -1,5 +1,8 @@
 package gohub
 
+// PartitionContext is for doing checkpoint.
+// If receiver mode is FromNow, the checkpoint operation will do nothing.
+// If receiver mode is FromLastOffset, you must provide storage account setting to make checkpoint works.
 type PartitionContext interface {
 	Checkpoint(offset string, seqNo int64) error
 	GetId() string

@@ -11,9 +11,6 @@ const (
 	sequenceNumberKey 	string = `x-opt-sequence-number`
 	defaultConsumerGroup 	string = `$Default`
 	defaultPrefetchCount 	int = 999
-
-	FromLastOffset		ReceiveMode = "FromLastOffset"
-	FromNow			ReceiveMode = "FromNow"
 )
 
 type ReceiveMode string
@@ -22,11 +19,11 @@ type ReceiveMode string
 type ReceiverOption func(*receiverSetting)
 
 type receiverSetting struct {
-	partitionId	string
-	consumerGroup	string
-	prefetchCount	int
-	storageSetting	*StorageSetting
-	mode		ReceiveMode
+	partitionId		string
+	consumerGroup		string
+	prefetchCount		int
+	epochTimeInMillisec	*int64
+	storageSetting		*StorageSetting
 }
 
 // ConsumerGroup returns a ReceiverOption that sets consumer group.
@@ -35,15 +32,15 @@ func ConsumerGroup(s string) ReceiverOption { return func(l *receiverSetting) { 
 // PrefetchCount returns a ReceiverOption that sets prefetch count.
 func PrefetchCount(i int) ReceiverOption { return func(l *receiverSetting) { l.prefetchCount = i } }
 
-// Mode returns a ReceiverOption that sets receiver mode. This can be FromLastOffset or FromNow.
-func Mode(mode ReceiveMode) ReceiverOption {
+// FromTime returns a ReceiverOption that make this receiver start receive message from specific time.
+func FromTime(epochTimeInMillisec int64) ReceiverOption {
 	return func(l *receiverSetting) {
-		l.mode = mode
+		l.epochTimeInMillisec = &epochTimeInMillisec
 	}
 }
 
-// StorageAccount returns a ReceiverOption that Azure Storage Account. If you use FromLastOffset mode, this is mandatory.
-func StorageAccount(ss StorageSetting) ReceiverOption {
+// FromLastOffset returns a ReceiverOption that make this receiver start receive message last offset.
+func FromLastOffset(ss StorageSetting) ReceiverOption {
 	return func(l *receiverSetting) {
 		l.storageSetting = &StorageSetting{
 			Name: ss.Name,
