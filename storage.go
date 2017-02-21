@@ -7,7 +7,6 @@ import (
 	"crypto/md5"
 	"encoding/base64"
 	"bytes"
-	log "github.com/Sirupsen/logrus"
 )
 
 const (
@@ -75,7 +74,6 @@ func (s*azureStorage) CreateStorage(hub, cg, pid string) error {
 		return err
 	}
 	if exists {
-		log.WithFields(log.Fields{"Hub": hub, "ConsumerGroup": cg, "PartitionID": pid}).Debug("Lease Exists")
 		return nil
 	}
 	if err = bs.CreateBlockBlob(hub, bn); err != nil {
@@ -95,11 +93,6 @@ func (s*azureStorage) GetCheckpoint(hub, cg, pid string) (checkpoint, error) {
 	if l.Offset == "" {
 		l.Offset = "-1"
 	}
-	log.WithFields(log.Fields{
-		"Offset": l.Offset,
-		"SeqNo": l.SeqNo,
-		"PartitionID": l.PartitionId},
-	).Debug("Got latest offset")
 	return checkpoint{offset: l.Offset, seqNo: l.SeqNo}, nil
 }
 
@@ -145,7 +138,6 @@ func (s*azureStorage) createNewLease(hub, cg, pid string) error {
 	if err := s.saveLease(hub, cg, pid, l); err != nil {
 		return err
 	}
-	log.Debug("New Lease Created")
 	return nil
 }
 
