@@ -120,10 +120,10 @@ func (s*azureStorage) getLease(hub, cg, pid string) (lease, error) {
 	var l lease
 	bs := s.c.GetBlobService()
 	r, err := bs.GetBlob(hub, getBlobName(cg, pid))
-	defer r.Close()
 	if err != nil {
 		return l, err
 	}
+	defer r.Close()
 	b, err := ioutil.ReadAll(r)
 	if err != nil {
 		return l, err
