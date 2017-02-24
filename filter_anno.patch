@@ -1,23 +1,24 @@
-From 4c1f8a36696db8cc34663b1e518fa10be5bafbba Mon Sep 17 00:00:00 2001
+From 9279d4856948f1f176c444c44722e520ebe78efc Mon Sep 17 00:00:00 2001
 From: Paladetch Usavasereelert <paladetch.u@gmail.com>
-Date: Sat, 14 Jan 2017 13:42:50 +0900
-Subject: [PATCH] Add filter and fix annotation
+Date: Fri, 24 Feb 2017 13:17:10 +0900
+Subject: [PATCH] Patch for latest go1 branch
 
 ---
- amqp/message.go        | 16 +++++++++++++++-
+ amqp/message.go        | 19 ++++++++++++++++++-
  electron/link.go       |  5 +++++
- proton/wrappers_gen.go | 17 +++++++++++++++++
- 3 files changed, 37 insertions(+), 1 deletion(-)
+ proton/wrappers_gen.go | 20 ++++++++++++++++++++
+ 3 files changed, 43 insertions(+), 1 deletion(-)
 
 diff --git a/amqp/message.go b/amqp/message.go
-index 753682e..2b0a281 100644
+index 753682e..4f9c33c 100644
 --- a/amqp/message.go
 +++ b/amqp/message.go
-@@ -302,7 +302,21 @@ func (m *message) SetReplyToGroupId(s string) {
+@@ -302,7 +302,24 @@ func (m *message) SetReplyToGroupId(s string) {
  func (m *message) SetInstructions(v map[string]interface{}) {
  	setData(v, C.pn_message_instructions(m.pn))
  }
 -func (m *message) SetAnnotations(v map[string]interface{}) { setData(v, C.pn_message_annotations(m.pn)) }
++
 +func (m *message) SetAnnotations(v map[string]interface{}) {
 +	d := C.pn_message_annotations(m.pn)
 +	for k, v := range v {
@@ -33,47 +34,50 @@ index 753682e..2b0a281 100644
 +	}
 +	C.pn_data_exit(d)
 +}
++
++
  func (m *message) SetProperties(v map[string]interface{})  { setData(v, C.pn_message_properties(m.pn)) }
  
  // Marshal/Unmarshal body
 diff --git a/electron/link.go b/electron/link.go
-index 1d17894..4744310 100644
+index 4f927c1..9f6e11c 100644
 --- a/electron/link.go
 +++ b/electron/link.go
-@@ -80,6 +80,9 @@ func Capacity(n int) LinkOption { return func(l *linkSettings) { l.capacity = n
+@@ -83,6 +83,9 @@ func Capacity(n int) LinkOption { return func(l *linkSettings) { l.capacity = n
  // Prefetch returns a LinkOption that sets a receivers pre-fetch flag. Not relevant for a sender.
  func Prefetch(p bool) LinkOption { return func(l *linkSettings) { l.prefetch = p } }
  
 +// Filter returns a LinkOption that sets a filter.
 +func Filter(m map[string]string) LinkOption { return func(l *linkSettings) { l.filter = m } }
 +
- // AtMostOnce returns a LinkOption that sets "fire and forget" mode, messages
- // are sent but no acknowledgment is received, messages can be lost if there is
- // a network failure. Sets SndSettleMode=SendSettled and RcvSettleMode=RcvFirst
-@@ -130,6 +133,7 @@ type linkSettings struct {
- 	rcvSettle RcvSettleMode
- 	capacity  int
- 	prefetch  bool
-+	filter	map[string]string
- 	session   *session
- 	pLink     proton.Link
+ // DurableSubscription returns a LinkOption that configures a Receiver as a named durable
+ // subscription.  The name overrides (and is overridden by) LinkName() so you should normally
+ // only use one of these options.
+@@ -161,6 +164,7 @@ type linkSettings struct {
+ 	rcvSettle      RcvSettleMode
+ 	capacity       int
+ 	prefetch       bool
++	filter	       map[string]string
+ 	session        *session
+ 	pLink          proton.Link
  }
-@@ -175,6 +179,7 @@ func makeLocalLink(sn *session, isSender bool, setting ...LinkOption) (linkSetti
+@@ -227,6 +231,7 @@ func makeLocalLink(sn *session, isSender bool, setting ...LinkOption) (linkSetti
  		return l, fmt.Errorf("cannot create link %s", l.pLink)
  	}
  	l.pLink.Source().SetAddress(l.source)
 +	l.pLink.Source().SetFilter(l.filter)
- 	l.pLink.Target().SetAddress(l.target)
- 	l.pLink.SetSndSettleMode(proton.SndSettleMode(l.sndSettle))
- 	l.pLink.SetRcvSettleMode(proton.RcvSettleMode(l.rcvSettle))
+ 	l.pLink.Source().SetDurability(l.sourceSettings.Durability)
+ 	l.pLink.Source().SetExpiryPolicy(l.sourceSettings.Expiry)
+ 	l.pLink.Source().SetTimeout(l.sourceSettings.Timeout)
 diff --git a/proton/wrappers_gen.go b/proton/wrappers_gen.go
-index 19bfde2..16e2fba 100644
+index 0db04c8..337720c 100644
 --- a/proton/wrappers_gen.go
 +++ b/proton/wrappers_gen.go
-@@ -611,6 +611,23 @@ func (t Terminus) SetAddress(address string) int {
+@@ -613,6 +613,26 @@ func (t Terminus) SetAddress(address string) int {
  
  	return int(C.pn_terminus_set_address(t.pn, addressC))
  }
++
 +func (t Terminus) SetFilter(filter map[string]string) bool {
 +	d := Data{C.pn_terminus_filter(t.pn)}
 +	for k, v := range filter {
@@ -91,9 +95,11 @@ index 19bfde2..16e2fba 100644
 +	}
 +	return bool(C.pn_data_exit(d.pn));
 +}
++
++
  func (t Terminus) SetDistributionMode(mode DistributionMode) int {
  	return int(C.pn_terminus_set_distribution_mode(t.pn, C.pn_distribution_mode_t(mode)))
  }
 -- 
-2.10.1 (Apple Git-78)
+2.4.9 (Apple Git-60)
 
