@@ -75,8 +75,12 @@ func (r*evhReceiver) Receive(out chan <- ReceiveMessage) {
 			out <- ReceiveMessage{Error: err}
 			break
 		} else {
+			msg := ""
+			if rm.Message.Body() != nil {
+				msg = string(rm.Message.Body().(amqp.Binary))
+			}
 			ret := ReceiveMessage{
-				Msg: string(rm.Message.Body().(amqp.Binary)),
+				Msg: msg,
 				Offset: rm.Message.Annotations()[offset].(string),
 				SeqNo: rm.Message.Annotations()[sequenceNumber].(int64),
 				PartitionId: r.partitionId,
