@@ -88,8 +88,13 @@ func (r*evhReceiver) Receive(out chan <- ReceiveMessage) PartitionContext {
 				out <- ReceiveMessage{Error: err}
 				break
 			} else {
+				var body []byte
+				if rm.Message.Body() != nil {
+					body = []byte(rm.Message.Body().(amqp.Binary))
+				}
+
 				ret := ReceiveMessage{
-					Body: []byte(rm.Message.Body().(amqp.Binary)),
+					Body: body,
 					Offset: rm.Message.Annotations()[offsetKey].(string),
 					SeqNo: rm.Message.Annotations()[sequenceNumberKey].(int64),
 					PartitionId: r.p.GetId(),

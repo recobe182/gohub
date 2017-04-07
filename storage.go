@@ -3,7 +3,7 @@ package gohub
 import (
 	"encoding/json"
 	"io/ioutil"
-	azure "github.com/Azure/azure-sdk-for-go/storage"
+	azure "github.com/Azure/azure-storage-go"
 	"crypto/md5"
 	"encoding/base64"
 	"bytes"
@@ -64,7 +64,8 @@ func newAzureStorage(ss StorageSetting) *azureStorage {
 
 func (s*azureStorage) CreateStorage(hub, cg, pid string) error {
 	bs := s.c.GetBlobService()
-	_, err := bs.CreateContainerIfNotExists(hub, azure.ContainerAccessTypeBlob)
+	container := bs.GetContainerReference(hub)
+	_, err := container.CreateIfNotExists()
 	if err != nil {
 		return err
 	}
