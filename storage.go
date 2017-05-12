@@ -3,14 +3,10 @@ package gohub
 import (
 	"encoding/json"
 	"io/ioutil"
-	azure "github.com/Azure/azure-storage-go"
+	azure "github.com/Azure/azure-sdk-for-go/storage"
 	"crypto/md5"
 	"encoding/base64"
 	"bytes"
-)
-
-const (
-	contentMd5 string = `Content-MD5`
 )
 
 type StorageSetting struct {
@@ -65,19 +61,22 @@ func newAzureStorage(ss StorageSetting) *azureStorage {
 func (s*azureStorage) CreateStorage(hub, cg, pid string) error {
 	bs := s.c.GetBlobService()
 	container := bs.GetContainerReference(hub)
-	_, err := container.CreateIfNotExists()
+	// TODO figure out proper option?
+	_, err := container.CreateIfNotExists(nil)
 	if err != nil {
 		return err
 	}
 	bn := getBlobName(cg, pid)
-	exists, err := bs.BlobExists(hub, bn)
+	br := container.GetBlobReference(bn)
+	exists, err := br.Exists()
 	if err != nil {
 		return err
 	}
 	if exists {
 		return nil
 	}
-	if err = bs.CreateBlockBlob(hub, bn); err != nil {
+	// TODO figure out proper option?
+	if err = br.CreateBlockBlob(nil); err != nil {
 		return err
 	}
 	if err = s.createNewLease(hub, cg, pid); err != nil {
@@ -113,7 +112,10 @@ func (s*azureStorage) SaveCheckpoint(hub, cg, pid string, cp checkpoint) error {
 func (s*azureStorage) getLease(hub, cg, pid string) (lease, error) {
 	var l lease
 	bs := s.c.GetBlobService()
-	r, err := bs.GetBlob(hub, getBlobName(cg, pid))
+	container := bs.GetContainerReference(hub)
+	br := container.GetBlobReference(getBlobName(cg, pid))
+	// TODO figure out proper option?
+	r, err := br.Get(nil)
 	if err != nil {
 		return l, err
 	}
@@ -152,15 +154,18 @@ func (s*azureStorage) saveLease(hub, cg, pid string, l lease) error {
 	h.Write(b)
 	md5 := base64.StdEncoding.EncodeToString(h.Sum(nil))
 
-	headers := make(map[string]string)
-	headers[contentMd5] = md5
+	opt := &azure.PutBlockOptions{
+		ContentMD5: md5,
+	}
 
 	bn := getBlobName(cg, pid)
 	bs := s.c.GetBlobService()
-	if err := bs.PutBlockWithLength(hub, bn, md5, uint64(len(b)), bytes.NewReader(b), headers); err != nil {
+	container := bs.GetContainerReference(hub)
+	br := container.GetBlobReference(bn)
+	if err := br.PutBlockWithLength(md5, uint64(len(b)), bytes.NewReader(b), opt); err != nil {
 		return err
 	}
-	if err := bs.PutBlockList(hub, bn, []azure.Block{{ID: md5, Status: azure.BlockStatusLatest}}); err != nil {
+	if err := br.PutBlockList([]azure.Block{{ID: md5, Status: azure.BlockStatusLatest}}, nil); err != nil {
 		return err
 	}
 	return nil
