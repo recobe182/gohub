@@ -64,4 +64,4 @@ docker pull recobe/ubuntu:16.10-proton
 ```
 
 ## Patching qpid.apache.org/electron and proton
-In order to use this library, you need to patch qpid.apache.org/electron and proton to make it supports for filtering. Azure Event Hub client has to set filter to specify the offset where the client will start consume messages from. Please use add_filter.patch to patch qpid.apache.org/electron and proton. 
+In order to use this library, you need to patch qpid.apache.org/electron and proton to make it supports marshal/unmarshl timestamp data type. Please use timestamp.patch to patch qpid.apache.org/electron and proton. 

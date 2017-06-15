@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"strings"
 	"time"
+	"qpid.apache.org/amqp"
 )
 
 const (
@@ -142,8 +143,11 @@ func (c*evhConnection) CreateReceiver(pid int, opts ...ReceiverOption) (EVHRecei
 }
 
 func (c*evhConnection) newReceiver(rs receiverSetting) (EVHReceiver, error) {
-	m := make(map[string]string)
+	m := make(map[amqp.Symbol]interface{})
 	var as storage
+	desc := amqp.Described{
+		Descriptor: amqp.Symbol("apache.org:selector-filter:string"),
+	}
 	if rs.storageSetting != nil {
 		as = newAzureStorage(*rs.storageSetting)
 		as.CreateStorage(c.hub, rs.consumerGroup, rs.partitionId)
@@ -151,12 +155,13 @@ func (c*evhConnection) newReceiver(rs receiverSetting) (EVHReceiver, error) {
 		if err != nil {
 			return nil, err
 		}
-		m[selectorFilter] = fmt.Sprintf(amqpAnnotationFormat, offsetAnnotationName, cp.offset)
+		desc.Value = fmt.Sprintf(amqpAnnotationFormat, offsetAnnotationName, cp.offset)
 	} else if rs.epochTimeInMillisec != nil {
-		m[selectorFilter] = fmt.Sprintf(amqpAnnotationFormat, enqueuedTimeAnnotationName, *rs.epochTimeInMillisec)
+		desc.Value = fmt.Sprintf(amqpAnnotationFormat, enqueuedTimeAnnotationName, *rs.epochTimeInMillisec)
 	} else {
 		panic(fmt.Sprintf("Invalid receiver configuration. No storage setting or epoch time in millisecond."))
 	}
+	m[amqp.Symbol("string")] = desc
 
 	r, err := c.conn.Receiver(
 		electron.Source(fmt.Sprintf(receivePattern, c.hub, rs.consumerGroup, rs.partitionId)),

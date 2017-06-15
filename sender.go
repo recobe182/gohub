@@ -121,9 +121,9 @@ func getAmqpMessage(body []byte, pk *string) amqp.Message{
 	m.SetInferred(true)
 	m.Marshal(body)
 	if pk != nil {
-		a := make(map[string]interface{})
-		a[partitionKey] = *pk
-		m.SetAnnotations(a)
+		anno := make(map[amqp.AnnotationKey]interface{})
+		anno[amqp.AnnotationKeyString(partitionKey)] = *pk
+		m.SetMessageAnnotations(anno)
 	}
 	return m
 }

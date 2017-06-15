@@ -1,0 +1,24 @@
+diff --git a/amqp/unmarshal.go b/amqp/unmarshal.go
+index 253d66d..d8f03a2 100644
+--- a/amqp/unmarshal.go
++++ b/amqp/unmarshal.go
+@@ -29,6 +29,7 @@ import (
+ 	"reflect"
+ 	"strings"
+ 	"unsafe"
++	"time"
+ )
+ 
+ const minDecode = 1024
+@@ -547,6 +548,11 @@ func getInterface(data *C.pn_data_t, v *interface{}) {
+ 		// Allow decoding from an empty data object to an interface, treat it like NULL.
+ 		// This happens when optional values or properties are omitted from a message.
+ 		*v = nil
++	case C.PN_TIMESTAMP:
++		tms := int64(C.pn_data_get_timestamp(data))
++		// Convert millisecond to second before parsing.
++		tm := time.Unix(tms / 1000, 0)
++		*v = tm
+ 	default: // Don't know how to handle this
+ 		panic(newUnmarshalError(pnType, v))
+ 	}
